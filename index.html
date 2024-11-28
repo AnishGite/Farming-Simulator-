@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Farm Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-green: #8BC34A;
+            --dark-green: #4A7023;
+            --earth-brown: #967259;
+            --sky-blue: #87CEEB;
+            --accent-orange: #FFA500;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--sky-blue);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        #game-container {
+            background-color: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        #farm-section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #farm-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .plot {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            background-color: var(--earth-brown);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+        }
+
+        .plot:hover {
+            transform: scale(1.05);
+        }
+
+        .plot.selected {
+            outline: 3px solid var(--accent-orange);
+        }
+
+        #stats-section {
+            background-color: var(--primary-green);
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .stat-card {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            background-color: var(--accent-orange);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover:not(:disabled) {
+            background-color: #FF8C00;
+        }
+
+        .btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        #achievements {
+            margin-top: 20px;
+            background-color: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .achievement {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            opacity: 0.5;
+            transition: opacity 0.3s ease;
+        }
+
+        .achievement-icon {
+            width: 30px;
+            height: 30px;
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--dark-green);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="farm-section">
+            <h2>Your Farm</h2>
+            <div id="farm-grid">
+                <!-- Dynamically generated plots will go here -->
+            </div>
+            <div class="control-buttons">
+                <button id="plant-btn" class="btn">Plant Crop</button>
+                <button id="water-btn" class="btn" disabled>Water Crop</button>
+                <button id="harvest-btn" class="btn" disabled>Harvest</button>
+                <button id="next-day-btn" class="btn">Next Day</button>
+            </div>
+        </div>
+        <div id="stats-section">
+            <div class="stat-card">
+                <span>Money</span>
+                <strong id="money">100</strong>
+            </div>
+            <div class="stat-card">
+                <span>Day</span>
+                <strong id="day">1</strong>
+            </div>
+            <div id="achievements">
+                <h3>Achievements</h3>
+                <div class="achievement" data-achievement="firstSeed">
+                    <div class="achievement-icon">🌱</div>
+                    <span>First Seed Planted</span>
+                </div>
+                <div class="achievement" data-achievement="firstWater">
+                    <div class="achievement-icon">💧</div>
+                    <span>First Crop Watered</span>
+                </div>
+                <div class="achievement" data-achievement="firstHarvest">
+                    <div class="achievement-icon">🌾</div>
+                    <span>First Harvest</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        class FarmSimulator {
+            constructor() {
+                // DOM Elements
+                this.plots = [];
+                this.farmGrid = document.getElementById('farm-grid');
+                this.plantBtn = document.getElementById('plant-btn');
+                this.waterBtn = document.getElementById('water-btn');
+                this.harvestBtn = document.getElementById('harvest-btn');
+                this.nextDayBtn = document.getElementById('next-day-btn');
+                this.moneySpan = document.getElementById('money');
+                this.daySpan = document.getElementById('day');
+                this.toastElement = document.getElementById('toast');
+
+                // Game State
+                this.money = 100;
+                this.day = 1;
+                this.selectedPlot = null;
+                this.achievements = {
+                    firstSeed: false,
+                    firstWater: false,
+                    firstHarvest: false
+                };
+
+                // Crop Stages
+                this.cropStages = [
+                    '🌱', // Seed
+                    '🌿', // Small Plant
+                    '🌾'  // Harvestable Plant
+                ];
+
+                this.initializeGame();
+            }
+
+            initializeGame() {
+                // Create 9 plots dynamically
+                for (let i = 0; i < 9; i++) {
+                    const plot = document.createElement('div');
+                    plot.classList.add('plot');
+                    plot.dataset.state = 'empty';
+                    plot.dataset.growth = '0';
+                    plot.addEventListener('click', () => this.selectPlot(plot));
+                    this.farmGrid.appendChild(plot);
+                    this.plots.push(plot);
+                }
+
+                // Event Listeners
+                this.plantBtn.addEventListener('click', () => this.plantCrop());
+                this.waterBtn.addEventListener('click', () => this.waterCrop());
+                this.harvestBtn.addEventListener('click', () => this.harvestCrop());
+                this.nextDayBtn.addEventListener('click', () => this.advanceDay());
+
+                // Initial setup
+                this.updateButtons();
+            }
+
+            selectPlot(plot) {
+                // Remove selection from previous plot
+                if (this.selectedPlot) {
+                    this.selectedPlot.classList.remove('selected');
+                }
+
+                // Select new plot
+                this.selectedPlot = plot;
+                this.selectedPlot.classList.add('selected');
+
+                // Update buttons
+                this.updateButtons();
+            }
+
+            plantCrop() {
+                const plantCost = 10;
+                if (this.money >= plantCost && this.selectedPlot && this.selectedPlot.dataset.state === 'empty') {
+                    // Add seed emoji
+                    this.selectedPlot.textContent = this.cropStages[0];
+                    this.selectedPlot.dataset.state = 'planted';
+                    this.selectedPlot.dataset.growth = '0';
+                    this.money -= plantCost;
+
+                    // First seed achievement
+                    this.unlockAchievement('firstSeed');
+
+                    this.updateMoneyAndButtons();
+                    this.showToast('Crop planted successfully!');
+                }
+            }
+
+            waterCrop() {
+                if (this.selectedPlot && this.selectedPlot.dataset.state === 'planted') {
+                    // Change to small plant emoji
+                    this.selectedPlot.textContent = this.cropStages[1];
+                    this.selectedPlot.dataset.state = 'growing';
+                    this.selectedPlot.dataset.growth = '1';
+
+                    // First water achievement
+                    this.unlockAchievement('firstWater');
+
+                    this.updateButtons();
+                    this.showToast('Crop watered successfully!');
+                }
+            }
+
+            harvestCrop() {
+                const harvestReward = 50;
+                if (this.selectedPlot && this.selectedPlot.dataset.state === 'harvestable') {
+                    this.money += harvestReward;
+                    
+                    // Clear plot
+                    this.selectedPlot.textContent = '';
+                    this.selectedPlot.dataset.state = 'empty';
+                    this.selectedPlot.dataset.growth = '0';
+
+                    // First harvest achievement
+                    this.unlockAchievement('firstHarvest');
+
+                    this.updateMoneyAndButtons();
+                    this.showToast(`Harvested! Earned $${harvestReward}`);
+                }
+            }
+
+            advanceDay() {
+                this.day++;
+                this.daySpan.textContent = this.day;
+
+                this.plots.forEach(plot => {
+                    if (plot.dataset.state === 'growing') {
+                        const growth = parseInt(plot.dataset.growth);
+                        if (growth < 2) {
+                            plot.dataset.growth = (growth + 1).toString();
+                            // Update emoji to next stage
+                            plot.textContent = this.cropStages[growth + 1];
+                        } else {
+                            plot.dataset.state = 'harvestable';
+                            plot.textContent = this.cropStages[2];
+                        }
+                    }
+                    this.updateButtons();
+                });
+            }
+
+            updateButtons() {
+                const plantCost = 10;
+                this.plantBtn.disabled = !this.selectedPlot || this.selectedPlot.dataset.state !== 'empty' || this.money < plantCost;
+                this.waterBtn.disabled = !this.selectedPlot || this.selectedPlot.dataset.state !== 'planted';
+                this.harvestBtn.disabled = !this.selectedPlot || this.selectedPlot.dataset.state !== 'harvestable';
+                this.moneySpan.textContent = this.money;
+            }
+
+            updateMoneyAndButtons() {
+                this.updateButtons();
+            }
+
+            unlockAchievement(achievementKey) {
+                if (!this.achievements[achievementKey]) {
+                    this.achievements[achievementKey] = true;
+                    const achievementElement = document.querySelector(`.achievement[data-achievement="${achievementKey}"]`);
+                    if (achievementElement) {
+                        achievementElement.style.opacity = '1';
+                        achievementElement.querySelector('.achievement-icon').style.backgroundColor = 'rgba(255,255,255,0.5)';
+                    }
+                }
+            }
+
+            showToast(message, duration = 3000) {
+                this.toastElement.textContent = message;
+                this.toastElement.style.opacity = '1';
+                setTimeout(() => {
+                    this.toastElement.style.opacity = '0';
+                }, duration);
+            }
+        }
+
+        // Initialize the game when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new FarmSimulator();
+        });
+    </script>
+</body>
+</html>
